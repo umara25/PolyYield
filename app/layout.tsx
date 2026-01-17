@@ -10,7 +10,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "PolySafeBets",
+  title: "Polyield",
   description: "No-Lose Prediction Markets - Your principal is always protected",
   generator: "v0.app",
 }
