@@ -49,7 +49,7 @@ export function HowItWorks() {
   }
 
   return (
-    <section id="how-it-works" className="py-24 border-t border-border/50">
+    <section id="how-it-works" className="py-24 border-t border-border/50 relative z-10">
       <div className="container">
         <div className="text-center mb-16">
           <span className="font-mono text-sm text-primary uppercase tracking-wider">How It Works</span>

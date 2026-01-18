@@ -2,7 +2,7 @@
 
 ## Summary
 
-This PR integrates **real-time Polymarket predictions** into Poly Yield, fetching live market data directly from Polymarket's Gamma API. Markets are now displayed on a dedicated `/markets` page with smart category detection, accurate prices, trading volumes, and market images.
+This PR integrates **real-time Polymarket predictions** into PolyYield, fetching live market data directly from Polymarket's Gamma API. Markets are now displayed on a dedicated `/markets` page with smart category detection, accurate prices, trading volumes, and market images.
 
 ## 🚀 Key Features
 

@@ -4,7 +4,7 @@
     "name": "polyield_vault",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Poly Yield USDC Vault Program for prediction market deposits"
+    "description": "PolyYield USDC Vault Program for prediction market deposits"
   },
   "instructions": [
     {

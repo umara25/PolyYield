@@ -48,4 +48,4 @@ CREATE POLICY "Enable all operations for all users" ON user_positions
     WITH CHECK (true);
 
 -- Add a comment to the table
-COMMENT ON TABLE user_positions IS 'Stores user positions for Poly Yield markets, indexed by wallet address for cross-device/browser persistence';
+COMMENT ON TABLE user_positions IS 'Stores user positions for PolyYield markets, indexed by wallet address for cross-device/browser persistence';

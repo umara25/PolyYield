@@ -1,4 +1,4 @@
-# Poly Yield Vault - Solana Anchor Program
+# PolyYield Vault - Solana Anchor Program
 
 A PDA-controlled USDC vault for prediction market deposits on Solana.
 
@@ -156,7 +156,7 @@ anchor test --skip-local-validator
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    POLY YIELD VAULT                          │
+│                    POLYIELD VAULT                            │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │   User A ──────┐                                             │
