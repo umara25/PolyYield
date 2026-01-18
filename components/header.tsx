@@ -1,13 +1,27 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Logo } from "./logo"
 import { MobileMenu } from "./mobile-menu"
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
 
 export const Header = () => {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20)
+    }
+
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
   return (
-    <div className="fixed z-50 pt-8 md:pt-14 top-0 left-0 w-full">
+    <div className={`fixed z-50 pt-8 md:pt-14 top-0 left-0 w-full transition-all duration-300 ${
+      scrolled ? "backdrop-blur-xl bg-black/80 border-b border-border/50 pt-4 md:pt-6" : ""
+    }`}>
       <header className="flex items-center justify-between container">
         <Link href="/">
           <Logo className="w-[160px] md:w-[180px]" />
