@@ -122,13 +122,10 @@ export function DepositModal({
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className={`font-mono text-sm uppercase px-2 py-0.5 border ${position === "yes"
-              ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
-              : "text-rose-400 border-rose-500/30 bg-rose-500/10"
+                ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                : "text-rose-400 border-rose-500/30 bg-rose-500/10"
               }`}>
-              Predict {position}
-            </span>
-            <span className="font-mono text-xs text-foreground/40">
-              @ {currentOdds}%
+              Predict {position} @ {currentOdds}%
             </span>
             <span className="font-mono text-[10px] uppercase px-1.5 py-0.5 border border-amber-500/30 bg-amber-500/10 text-amber-400 flex items-center gap-1 ml-auto">
               <Shield className="w-2.5 h-2.5" />

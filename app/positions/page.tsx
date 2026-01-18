@@ -5,7 +5,6 @@ export default function PositionsPage() {
   return (
     <div className="container py-24 min-h-screen">
       <div className="mb-12">
-        <Pill className="mb-6">Portfolio</Pill>
         <h1 className="text-4xl md:text-5xl font-sentient mb-4">
           Your <i className="font-light">Positions</i>
         </h1>
