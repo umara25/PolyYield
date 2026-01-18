@@ -68,17 +68,17 @@ export function DepositModal({
 
   const handleDeposit = async () => {
     if (numericAmount <= 0) return
-    
+
     // Parse expiry string to timestamp, fallback to 30 days from now
     const expiryTimestamp = marketExpiry
       ? new Date(marketExpiry).getTime()
       : Date.now() + (30 * 24 * 60 * 60 * 1000)
 
     const signature = await deposit(
-      numericAmount, 
-      marketId, 
-      positionEnum, 
-      marketQuestion, 
+      numericAmount,
+      marketId,
+      positionEnum,
+      marketQuestion,
       expiryTimestamp
     )
 
@@ -122,8 +122,8 @@ export function DepositModal({
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className={`font-mono text-sm uppercase px-2 py-0.5 border ${position === "yes"
-                ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
-                : "text-rose-400 border-rose-500/30 bg-rose-500/10"
+              ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+              : "text-rose-400 border-rose-500/30 bg-rose-500/10"
               }`}>
               Predict {position}
             </span>

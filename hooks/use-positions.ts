@@ -67,7 +67,7 @@ export function usePositions() {
     setIsLoading(true)
     setError(null)
 
-    try {
+      try {
       if (useLocalStorage) {
         // Fallback to localStorage if Supabase not configured
         const stored = localStorage.getItem(`polyield_positions_${publicKey.toBase58()}`)
@@ -86,7 +86,7 @@ export function usePositions() {
         calculateTotals(uiPositions)
       }
     } catch (e) {
-      console.error("Failed to load positions", e)
+        console.error("Failed to load positions", e)
       setError(e instanceof Error ? e.message : "Failed to load positions")
       setPositions([])
     } finally {
@@ -136,25 +136,25 @@ export function usePositions() {
     try {
       if (useLocalStorage) {
         // Fallback to localStorage
-        const newPosition: UserPosition = {
-          id: Math.random().toString(36).substring(7),
-          marketId,
-          marketQuestion,
-          position,
-          amount,
-          timestamp: Date.now(),
-          expiryTimestamp,
-          status: "active"
-        }
+    const newPosition: UserPosition = {
+      id: Math.random().toString(36).substring(7),
+      marketId,
+      marketQuestion,
+      position,
+      amount,
+      timestamp: Date.now(),
+      expiryTimestamp,
+      status: "active"
+    }
 
-        const updated = [...positions, newPosition]
-        setPositions(updated)
-        calculateTotals(updated)
-        
-        localStorage.setItem(
-          `polyield_positions_${publicKey.toBase58()}`, 
-          JSON.stringify(updated)
-        )
+    const updated = [...positions, newPosition]
+    setPositions(updated)
+    calculateTotals(updated)
+    
+    localStorage.setItem(
+      `polyield_positions_${publicKey.toBase58()}`, 
+      JSON.stringify(updated)
+    )
       } else {
         // Use Supabase database - will be added by use-deposit hook
         // This will trigger a refresh to load the newly added position
