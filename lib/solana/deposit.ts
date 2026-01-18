@@ -8,11 +8,13 @@ import {
 } from "@solana/web3.js"
 import {
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
   getAccount,
+  getMint,
 } from "@solana/spl-token"
 import {
   USDC_MINT,
@@ -23,6 +25,25 @@ import {
   USER_DEPOSIT_SEED,
   Position,
 } from "./constants"
+
+/**
+ * Get the correct token program for a mint
+ */
+export async function getTokenProgramForMint(
+  connection: Connection,
+  mint: PublicKey
+): Promise<PublicKey> {
+  try {
+    // Try TOKEN_2022 first (devnet USDC often uses this)
+    const mintInfo = await getMint(connection, mint, "confirmed", TOKEN_2022_PROGRAM_ID)
+    if (mintInfo) {
+      return TOKEN_2022_PROGRAM_ID
+    }
+  } catch {
+    // Fall back to regular TOKEN_PROGRAM_ID
+  }
+  return TOKEN_PROGRAM_ID
+}
 
 /**
  * Get the vault PDA address
@@ -81,35 +102,42 @@ export function lamportsToUsdc(lamports: bigint): number {
  * Build the deposit instruction discriminator
  * This is the first 8 bytes of SHA256("global:deposit")
  */
-function getDepositDiscriminator(): Buffer {
+function getDepositDiscriminator(): number[] {
   // Pre-computed discriminator for "deposit" instruction
-  return Buffer.from([242, 35, 198, 137, 82, 225, 242, 182])
+  return [242, 35, 198, 137, 82, 225, 242, 182]
 }
 
 /**
  * Encode the position enum for the instruction
  */
-function encodePosition(position: Position): Buffer {
-  return Buffer.from([position])
+function encodePosition(position: Position): number[] {
+  return [position]
 }
 
 /**
  * Encode a string with length prefix (Borsh format)
  */
-function encodeString(str: string): Buffer {
-  const strBuffer = Buffer.from(str, "utf-8")
-  const lenBuffer = Buffer.alloc(4)
-  lenBuffer.writeUInt32LE(strBuffer.length)
-  return Buffer.concat([lenBuffer, strBuffer])
+function encodeString(str: string): number[] {
+  const strBytes = Array.from(Buffer.from(str, "utf-8"))
+  const lenBytes = [
+    str.length & 0xff,
+    (str.length >> 8) & 0xff,
+    (str.length >> 16) & 0xff,
+    (str.length >> 24) & 0xff,
+  ]
+  return [...lenBytes, ...strBytes]
 }
 
 /**
  * Encode u64 in little-endian format
  */
-function encodeU64(value: bigint): Buffer {
-  const buffer = Buffer.alloc(8)
-  buffer.writeBigUInt64LE(value)
-  return buffer
+function encodeU64(value: bigint): number[] {
+  const bytes: number[] = []
+  for (let i = 0; i < 8; i++) {
+    bytes.push(Number(value & BigInt(0xff)))
+    value = value >> BigInt(8)
+  }
+  return bytes
 }
 
 /**
@@ -125,7 +153,7 @@ function buildDepositInstructionData(
   const marketIdBuffer = encodeString(marketId)
   const positionBuffer = encodePosition(position)
 
-  return Buffer.concat([discriminator, amountBuffer, marketIdBuffer, positionBuffer])
+  return Buffer.from([...discriminator, ...amountBuffer, ...marketIdBuffer, ...positionBuffer])
 }
 
 export interface DepositParams {
@@ -157,16 +185,21 @@ export async function buildDepositTransaction(
   const [vaultState] = getVaultStatePDA()
   const [userDeposit] = getUserDepositPDA(userPublicKey, marketId, position)
 
-  // Get user's USDC token account
+  // Get the correct token program for this mint
+  const tokenProgram = await getTokenProgramForMint(connection, USDC_MINT)
+
+  // Get user's USDC token account (using the correct token program)
   const userTokenAccount = await getAssociatedTokenAddress(
     USDC_MINT,
-    userPublicKey
+    userPublicKey,
+    false,
+    tokenProgram
   )
 
   // Check if user's token account exists
   let needsTokenAccountCreation = false
   try {
-    await getAccount(connection, userTokenAccount)
+    await getAccount(connection, userTokenAccount, "confirmed", tokenProgram)
   } catch {
     needsTokenAccountCreation = true
   }
@@ -184,50 +217,17 @@ export async function buildDepositTransaction(
         userPublicKey, // payer
         userTokenAccount, // ata
         userPublicKey, // owner
-        USDC_MINT // mint
+        USDC_MINT, // mint
+        tokenProgram // token program
       )
     )
   }
 
-  // --- TEMPORARY: Direct Transfer for Frontend Testing ---
-  // Since the Anchor program isn't deployed yet, we'll simulate the deposit
-  // by transferring USDC directly to the Vault's Token Account.
-  
-  // Get Vault's ATA
-  const vaultTokenAccount = await getAssociatedTokenAddress(
-    USDC_MINT,
-    vault,
-    true // allowOwnerOffCurve = true because vault is a PDA
-  )
-
-  // Check if Vault ATA exists, if not create it
-  try {
-    await getAccount(connection, vaultTokenAccount)
-  } catch {
-    transaction.add(
-      createAssociatedTokenAccountInstruction(
-        userPublicKey, // payer
-        vaultTokenAccount, // ata
-        vault, // owner
-        USDC_MINT // mint
-      )
-    )
-  }
-
-  // Add Transfer Instruction
-  transaction.add(
-    createTransferInstruction(
-      userTokenAccount, // source
-      vaultTokenAccount, // destination
-      userPublicKey, // owner
-      amountLamports
-    )
-  )
-
-  /* 
-  // Anchor Program Instruction (Commented out until deployment)
+  // Build the Anchor program deposit instruction
   const data = buildDepositInstructionData(amountLamports, marketId, position)
-  
+
+  // The vault is a PDA token account created by the initialize instruction
+  // seeds: ["vault", mint] - this IS the token account, not an ATA
   const depositInstruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
@@ -237,7 +237,7 @@ export async function buildDepositTransaction(
       { pubkey: vault, isSigner: false, isWritable: true },
       { pubkey: userTokenAccount, isSigner: false, isWritable: true },
       { pubkey: userDeposit, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: tokenProgram, isSigner: false, isWritable: false },
       { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
@@ -245,7 +245,6 @@ export async function buildDepositTransaction(
   })
 
   transaction.add(depositInstruction)
-  */
 
   // Get recent blockhash
   const { blockhash } = await connection.getLatestBlockhash()
@@ -268,11 +267,16 @@ export async function getUserUsdcBalance(
   userPublicKey: PublicKey
 ): Promise<number> {
   try {
+    // Get the correct token program for this mint
+    const tokenProgram = await getTokenProgramForMint(connection, USDC_MINT)
+
     const userTokenAccount = await getAssociatedTokenAddress(
       USDC_MINT,
-      userPublicKey
+      userPublicKey,
+      false,
+      tokenProgram
     )
-    const account = await getAccount(connection, userTokenAccount)
+    const account = await getAccount(connection, userTokenAccount, "confirmed", tokenProgram)
     return lamportsToUsdc(account.amount)
   } catch {
     // Account doesn't exist or has no balance
@@ -300,4 +304,69 @@ export async function getVaultTotalDeposits(connection: Connection): Promise<num
   } catch {
     return 0
   }
+}
+
+/**
+ * Build the initialize instruction discriminator
+ * This is the first 8 bytes of SHA256("global:initialize")
+ */
+function getInitializeDiscriminator(): Buffer {
+  // Pre-computed discriminator for "initialize" instruction from IDL
+  return Buffer.from([175, 175, 109, 31, 13, 152, 155, 237])
+}
+
+/**
+ * Build an initialize vault transaction
+ * This creates the vault state and vault token account PDAs
+ */
+export async function buildInitializeTransaction(
+  connection: Connection,
+  adminPublicKey: PublicKey
+): Promise<Transaction> {
+  const [vault] = getVaultPDA()
+  const [vaultState] = getVaultStatePDA()
+
+  // Get the correct token program for this mint
+  const tokenProgram = await getTokenProgramForMint(connection, USDC_MINT)
+
+  const transaction = new Transaction()
+
+  const data = getInitializeDiscriminator()
+
+  const initializeInstruction = new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: adminPublicKey, isSigner: true, isWritable: true },
+      { pubkey: USDC_MINT, isSigner: false, isWritable: false },
+      { pubkey: vaultState, isSigner: false, isWritable: true },
+      { pubkey: vault, isSigner: false, isWritable: true },
+      { pubkey: tokenProgram, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data,
+  })
+
+  transaction.add(initializeInstruction)
+
+  const { blockhash } = await connection.getLatestBlockhash()
+  transaction.recentBlockhash = blockhash
+  transaction.feePayer = adminPublicKey
+
+  return transaction
+}
+
+/**
+ * Get vault PDA address as string (for display)
+ */
+export function getVaultAddress(): string {
+  const [vault] = getVaultPDA()
+  return vault.toBase58()
+}
+
+/**
+ * Get vault state PDA address as string (for display)
+ */
+export function getVaultStateAddress(): string {
+  const [vaultState] = getVaultStatePDA()
+  return vaultState.toBase58()
 }

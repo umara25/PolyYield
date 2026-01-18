@@ -4,7 +4,9 @@ import { useState, useCallback } from "react"
 import { useConnection, useWallet } from "@solana/wallet-adapter-react"
 import { 
   buildDepositTransaction, 
+  buildInitializeTransaction,
   getUserUsdcBalance,
+  isVaultInitialized,
   Position,
 } from "@/lib/solana/deposit"
 import { 
@@ -90,7 +92,30 @@ export function useDeposit(): UseDepositReturn {
     }))
 
     try {
-      // Build the transaction
+      // Check if vault is initialized
+      const vaultReady = await isVaultInitialized(connection)
+      
+      if (!vaultReady) {
+        // Initialize the vault first
+        console.log("Vault not initialized, initializing...")
+        try {
+          const initTx = await buildInitializeTransaction(connection, publicKey)
+          const signedInitTx = await signTransaction(initTx)
+          
+          const initSignature = await connection.sendRawTransaction(
+            signedInitTx.serialize(),
+            { skipPreflight: true, preflightCommitment: "confirmed" }
+          )
+          
+          await connection.confirmTransaction(initSignature, "confirmed")
+          console.log("Vault initialized:", initSignature)
+        } catch (initError) {
+          console.error("Vault initialization failed:", initError)
+          throw new Error(`Vault initialization failed: ${initError instanceof Error ? initError.message : 'Unknown error'}`)
+        }
+      }
+
+      // Build the deposit transaction
       const { transaction } = await buildDepositTransaction({
         connection,
         userPublicKey: publicKey,
