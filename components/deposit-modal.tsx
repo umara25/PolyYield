@@ -68,15 +68,23 @@ export function DepositModal({
 
   const handleDeposit = async () => {
     if (numericAmount <= 0) return
-    const signature = await deposit(numericAmount, marketId, positionEnum)
+    
+    // Parse expiry string to timestamp, fallback to 30 days from now
+    const expiryTimestamp = marketExpiry
+      ? new Date(marketExpiry).getTime()
+      : Date.now() + (30 * 24 * 60 * 60 * 1000)
+
+    const signature = await deposit(
+      numericAmount, 
+      marketId, 
+      positionEnum, 
+      marketQuestion, 
+      expiryTimestamp
+    )
 
     if (signature) {
-      // Parse expiry string to timestamp, fallback to 30 days from now
-      const expiryTimestamp = marketExpiry
-        ? new Date(marketExpiry).getTime()
-        : Date.now() + (30 * 24 * 60 * 60 * 1000)
-
-      addPosition(marketId, marketQuestion, positionEnum, numericAmount, expiryTimestamp)
+      // If using localStorage fallback, also add to local state
+      addPosition(marketId, marketQuestion, positionEnum, numericAmount, expiryTimestamp, signature)
     }
   }
 

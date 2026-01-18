@@ -1,8 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { Position } from "@/lib/solana/constants"
+import { 
+  getPositionsByWallet,
+  isSupabaseConfigured 
+} from "@/lib/database/positions-service"
+import type { UserPosition as DbUserPosition } from "@/lib/database/types"
 
 export interface UserPosition {
   id: string
@@ -18,38 +23,80 @@ export interface UserPosition {
 // Mock APY for yield calculation (e.g., 12%)
 const MOCK_APY = 0.12
 
+// Convert database position to UI position format
+function convertDbPositionToUi(dbPosition: DbUserPosition): UserPosition {
+  return {
+    id: dbPosition.id,
+    marketId: dbPosition.market_id,
+    marketQuestion: dbPosition.market_question,
+    position: dbPosition.position === "YES" ? Position.Yes : Position.No,
+    amount: Number(dbPosition.amount),
+    timestamp: new Date(dbPosition.timestamp).getTime(),
+    expiryTimestamp: new Date(dbPosition.expiry_timestamp).getTime(),
+    status: dbPosition.status,
+  }
+}
+
 export function usePositions() {
   const { publicKey } = useWallet()
   const [positions, setPositions] = useState<UserPosition[]>([])
   const [totalYield, setTotalYield] = useState(0)
   const [totalValue, setTotalValue] = useState(0)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [useLocalStorage, setUseLocalStorage] = useState(false)
 
-  // Load positions from local storage
+  // Check if Supabase is configured, otherwise fall back to localStorage
   useEffect(() => {
+    const configured = isSupabaseConfigured()
+    setUseLocalStorage(!configured)
+    if (!configured) {
+      console.warn("Supabase not configured. Falling back to localStorage. Please set up .env.local with Supabase credentials.")
+    }
+  }, [])
+
+  // Load positions from Supabase or localStorage
+  const loadPositions = useCallback(async () => {
     if (!publicKey) {
       setPositions([])
+      setTotalYield(0)
+      setTotalValue(0)
       return
     }
 
-    const loadPositions = () => {
-      try {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      if (useLocalStorage) {
+        // Fallback to localStorage if Supabase not configured
         const stored = localStorage.getItem(`polyield_positions_${publicKey.toBase58()}`)
         if (stored) {
           const parsed = JSON.parse(stored)
           setPositions(parsed)
           calculateTotals(parsed)
+        } else {
+          setPositions([])
         }
-      } catch (e) {
-        console.error("Failed to load positions", e)
+      } else {
+        // Use Supabase database
+        const dbPositions = await getPositionsByWallet(publicKey.toBase58())
+        const uiPositions = dbPositions.map(convertDbPositionToUi)
+        setPositions(uiPositions)
+        calculateTotals(uiPositions)
       }
+    } catch (e) {
+      console.error("Failed to load positions", e)
+      setError(e instanceof Error ? e.message : "Failed to load positions")
+      setPositions([])
+    } finally {
+      setIsLoading(false)
     }
+  }, [publicKey, useLocalStorage])
 
+  useEffect(() => {
     loadPositions()
-    
-    // Listen for storage events to update real-time
-    window.addEventListener("storage", loadPositions)
-    return () => window.removeEventListener("storage", loadPositions)
-  }, [publicKey])
+  }, [loadPositions])
 
   const calculateTotals = (currentPositions: UserPosition[]) => {
     const now = Date.now()
@@ -76,34 +123,47 @@ export function usePositions() {
     setTotalValue(valueSum)
   }
 
-  const addPosition = (
+  const addPosition = async (
     marketId: string, 
     marketQuestion: string, 
     position: Position, 
     amount: number,
-    expiryTimestamp: number
+    expiryTimestamp: number,
+    transactionSignature?: string
   ) => {
     if (!publicKey) return
 
-    const newPosition: UserPosition = {
-      id: Math.random().toString(36).substring(7),
-      marketId,
-      marketQuestion,
-      position,
-      amount,
-      timestamp: Date.now(),
-      expiryTimestamp,
-      status: "active"
-    }
+    try {
+      if (useLocalStorage) {
+        // Fallback to localStorage
+        const newPosition: UserPosition = {
+          id: Math.random().toString(36).substring(7),
+          marketId,
+          marketQuestion,
+          position,
+          amount,
+          timestamp: Date.now(),
+          expiryTimestamp,
+          status: "active"
+        }
 
-    const updated = [...positions, newPosition]
-    setPositions(updated)
-    calculateTotals(updated)
-    
-    localStorage.setItem(
-      `polyield_positions_${publicKey.toBase58()}`, 
-      JSON.stringify(updated)
-    )
+        const updated = [...positions, newPosition]
+        setPositions(updated)
+        calculateTotals(updated)
+        
+        localStorage.setItem(
+          `polyield_positions_${publicKey.toBase58()}`, 
+          JSON.stringify(updated)
+        )
+      } else {
+        // Use Supabase database - will be added by use-deposit hook
+        // This will trigger a refresh to load the newly added position
+        await loadPositions()
+      }
+    } catch (e) {
+      console.error("Failed to add position", e)
+      setError(e instanceof Error ? e.message : "Failed to add position")
+    }
   }
 
   return {
@@ -111,6 +171,9 @@ export function usePositions() {
     totalYield,
     totalValue,
     addPosition,
+    isLoading,
+    error,
+    refreshPositions: loadPositions,
     apy: MOCK_APY
   }
 }

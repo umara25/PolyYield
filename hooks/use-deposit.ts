@@ -7,6 +7,10 @@ import {
   getUserUsdcBalance,
   Position,
 } from "@/lib/solana/deposit"
+import { 
+  createPosition, 
+  isSupabaseConfigured 
+} from "@/lib/database/positions-service"
 
 export interface DepositState {
   isLoading: boolean
@@ -16,7 +20,7 @@ export interface DepositState {
 }
 
 export interface UseDepositReturn extends DepositState {
-  deposit: (amount: number, marketId: string, position: Position) => Promise<string | null>
+  deposit: (amount: number, marketId: string, position: Position, marketQuestion: string, expiryTimestamp: number) => Promise<string | null>
   refreshBalance: () => Promise<void>
   clearError: () => void
   clearTx: () => void
@@ -50,7 +54,9 @@ export function useDeposit(): UseDepositReturn {
   const deposit = useCallback(async (
     amount: number,
     marketId: string,
-    position: Position
+    position: Position,
+    marketQuestion: string,
+    expiryTimestamp: number
   ): Promise<string | null> => {
     if (!publicKey || !signTransaction || !connected) {
       setState(prev => ({ 
@@ -113,6 +119,30 @@ export function useDeposit(): UseDepositReturn {
 
       if (confirmation.value.err) {
         throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`)
+      }
+
+      // Save position to database if Supabase is configured
+      const supabaseConfigured = isSupabaseConfigured()
+      if (supabaseConfigured) {
+        try {
+          await createPosition({
+            walletAddress: publicKey.toBase58(),
+            marketId,
+            marketQuestion,
+            position,
+            amount,
+            transactionSignature: signature,
+            timestamp: Date.now(),
+            expiryTimestamp,
+          })
+          console.log("Position saved to database successfully")
+        } catch (dbError) {
+          console.error("Failed to save position to database:", dbError)
+          // Don't fail the whole transaction if database save fails
+          // User can still see their transaction on-chain
+        }
+      } else {
+        console.warn("Supabase not configured. Position not saved to database. Please set up .env.local")
       }
 
       setState(prev => ({ 
