@@ -135,6 +135,9 @@ export function MarketCard({ market }: MarketCardProps) {
                 <span className="font-mono text-xs text-emerald-500/70">{formatCurrency(market.volume)} vol</span>
               </div>
             )}
+            <div className="flex items-center gap-1.5 text-emerald-400/80">
+              <span className="font-mono text-xs font-medium">12% APY</span>
+            </div>
           </div>
           <div className="flex items-center gap-1.5 text-foreground/40">
             <Calendar className="w-3.5 h-3.5" />
