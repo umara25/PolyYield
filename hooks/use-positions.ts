@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { Position } from "@/lib/solana/constants"
-import { 
+import {
   getPositionsByWallet,
-  isSupabaseConfigured 
+  isSupabaseConfigured
 } from "@/lib/database/positions-service"
 import type { UserPosition as DbUserPosition } from "@/lib/database/types"
 
@@ -67,10 +67,10 @@ export function usePositions() {
     setIsLoading(true)
     setError(null)
 
-      try {
+    try {
       if (useLocalStorage) {
         // Fallback to localStorage if Supabase not configured
-        const stored = localStorage.getItem(`polyield_positions_${publicKey.toBase58()}`)
+        const stored = localStorage.getItem(`poly_yield_positions_${publicKey.toBase58()}`)
         if (stored) {
           const parsed = JSON.parse(stored)
           setPositions(parsed)
@@ -86,7 +86,7 @@ export function usePositions() {
         calculateTotals(uiPositions)
       }
     } catch (e) {
-        console.error("Failed to load positions", e)
+      console.error("Failed to load positions", e)
       setError(e instanceof Error ? e.message : "Failed to load positions")
       setPositions([])
     } finally {
@@ -107,12 +107,12 @@ export function usePositions() {
       // Calculate yield: Principal * APY * (TimeDelta in Years)
       const timeDiff = now - pos.timestamp
       const yearsElapsed = timeDiff / (1000 * 60 * 60 * 24 * 365)
-      
+
       // In this model, assume yield is generated continuously
       // For winners, they get a share of total yield. 
       // For this demo, we'll simulate a projected yield based on the mock APY.
       const estimatedYield = pos.amount * MOCK_APY * yearsElapsed
-      
+
       if (pos.status === "active") {
         yieldSum += estimatedYield
         valueSum += pos.amount
@@ -124,9 +124,9 @@ export function usePositions() {
   }
 
   const addPosition = async (
-    marketId: string, 
-    marketQuestion: string, 
-    position: Position, 
+    marketId: string,
+    marketQuestion: string,
+    position: Position,
     amount: number,
     expiryTimestamp: number,
     transactionSignature?: string
@@ -136,25 +136,25 @@ export function usePositions() {
     try {
       if (useLocalStorage) {
         // Fallback to localStorage
-    const newPosition: UserPosition = {
-      id: Math.random().toString(36).substring(7),
-      marketId,
-      marketQuestion,
-      position,
-      amount,
-      timestamp: Date.now(),
-      expiryTimestamp,
-      status: "active"
-    }
+        const newPosition: UserPosition = {
+          id: Math.random().toString(36).substring(7),
+          marketId,
+          marketQuestion,
+          position,
+          amount,
+          timestamp: Date.now(),
+          expiryTimestamp,
+          status: "active"
+        }
 
-    const updated = [...positions, newPosition]
-    setPositions(updated)
-    calculateTotals(updated)
-    
-    localStorage.setItem(
-      `polyield_positions_${publicKey.toBase58()}`, 
-      JSON.stringify(updated)
-    )
+        const updated = [...positions, newPosition]
+        setPositions(updated)
+        calculateTotals(updated)
+
+        localStorage.setItem(
+          `poly_yield_positions_${publicKey.toBase58()}`,
+          JSON.stringify(updated)
+        )
       } else {
         // Use Supabase database - will be added by use-deposit hook
         // This will trigger a refresh to load the newly added position

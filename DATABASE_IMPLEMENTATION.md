@@ -215,7 +215,7 @@ To implement a migration script, you could:
 ```typescript
 // Example migration (run once per user)
 function migrateLocalStorageToSupabase(walletAddress: string) {
-  const stored = localStorage.getItem(`polyield_positions_${walletAddress}`)
+  const stored = localStorage.getItem(`poly_yield_positions_${walletAddress}`)
   if (stored) {
     const positions = JSON.parse(stored)
     // Batch insert to Supabase
